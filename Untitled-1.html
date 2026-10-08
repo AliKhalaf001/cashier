@@ -142,6 +142,7 @@
             <h2>دخول الكاشير</h2>
             <input type="password" id="pass-input" placeholder="كلمة السر" onkeydown="if(event.key==='Enter') login()">
             <button class="btn btn-primary" onclick="login()">دخول</button>
+            <button class="btn-link" onclick="openResetPasswordModal()">نسيت / تغيير كلمة السر؟</button>
             <p id="login-err" style="color:red; margin-top:10px; display:none;">كلمة السر خاطئة!</p>
         </div>
     </div>
@@ -155,6 +156,7 @@
             <button class="btn-sm btn-warning" onclick="openExpenseModal()">➕ إضافة مصروفات</button>
             <button class="btn-sm btn-danger" onclick="closeDay()">إنهاء اليوم</button>
             <button class="btn-sm btn-primary" onclick="toggleCalc()">آلة حاسبة</button>
+            <button class="btn-sm btn-warning" onclick="openResetPasswordModal()">🔒 تغيير كلمة السر</button>
         </div>
     </header>
 
@@ -243,9 +245,7 @@
                 </div>
 
                 <!-- مدخلات بيانات العملاء المخصصة ديناميكياً -->
-                <div class="customer-inputs-container" id="customer-inputs-box">
-                    <!-- يتم توليد الخانات تلقائياً بناءً على نوع الطلب -->
-                </div>
+                <div class="customer-inputs-container" id="customer-inputs-box"></div>
 
                 <table class="cart-table">
                     <thead>
@@ -363,8 +363,30 @@
         </div>
     </div>
 
+    <!-- نافذة إعادة تعيين كلمة السر بـ OTP -->
+    <div id="otp-modal" class="modal">
+        <div class="glass-modal" style="max-width: 400px;">
+            <h3>🔐 إعادة تعيين كلمة السر (OTP)</h3><br>
+            
+            <div id="otp-step-1">
+                <p style="font-size:13px; margin-bottom:10px;">اضغط لإرسال كود التحققOTP إلى النظام:</p>
+                <button class="btn btn-warning" onclick="sendOTP()">إرسال كود OTP 📩</button>
+            </div>
+
+            <div id="otp-step-2" style="display:none; margin-top:10px;">
+                <input type="text" id="otp-input" placeholder="أدخل كود التحقق (OTP)" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; text-align:center;">
+                <input type="password" id="new-pass-input" placeholder="كلمة السر الجديدة" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; text-align:center;">
+                <button class="btn btn-success" onclick="verifyAndChangePassword()">تأكيد وتغيير كلمة السر</button>
+            </div>
+
+            <button class="btn btn-primary" onclick="closeModal('otp-modal')" style="margin-top:10px;">إلغاء</button>
+        </div>
+    </div>
+
     <script>
-        let currentPassword = "1234";
+        let currentPassword = localStorage.getItem('pos_password') || "1234";
+        let generatedOTP = null;
+
         let cart = [];
         let dailyRevenue = 0;
         let safeBalance = 0;
@@ -406,10 +428,46 @@
             if (pass === currentPassword) {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('login-err').style.display = 'none';
-                renderCustomerInputs(); // التهيئة الأولى عند الدخول
+                renderCustomerInputs();
             } else {
                 document.getElementById('login-err').style.display = 'block';
             }
+        }
+
+        // 🔑 إدارة OTP وتغيير كلمة السر
+        function openResetPasswordModal() {
+            document.getElementById('otp-step-1').style.display = 'block';
+            document.getElementById('otp-step-2').style.display = 'none';
+            document.getElementById('otp-input').value = '';
+            document.getElementById('new-pass-input').value = '';
+            document.getElementById('otp-modal').style.display = 'flex';
+        }
+
+        function sendOTP() {
+            generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
+            alert(`📩 [إشعار نظام OTP]: كود التحقق الخاص بك هو: ${generatedOTP}`);
+            document.getElementById('otp-step-1').style.display = 'none';
+            document.getElementById('otp-step-2').style.display = 'block';
+        }
+
+        function verifyAndChangePassword() {
+            const userOTP = document.getElementById('otp-input').value.trim();
+            const newPass = document.getElementById('new-pass-input').value.trim();
+
+            if (userOTP !== generatedOTP) {
+                alert("❌ كود التحقق (OTP) غير صحيح!");
+                return;
+            }
+
+            if (!newPass || newPass.length < 4) {
+                alert("يرجى إدخال كلمة سر جديدة لا تقل عن 4 أرقام/حروف!");
+                return;
+            }
+
+            currentPassword = newPass;
+            localStorage.setItem('pos_password', newPass);
+            alert("✅ تم تغيير كلمة السر بنجاح!");
+            closeModal('otp-modal');
         }
 
         function switchTab(tabId) {
@@ -441,7 +499,6 @@
             renderCustomerInputs();
         }
 
-        // ⚙️ تغيير ورسم خانات البيانات بناءً على نوع الطلب المختارات
         function renderCustomerInputs() {
             const container = document.getElementById('customer-inputs-box');
             container.innerHTML = '';
@@ -461,12 +518,10 @@
                     <input type="text" id="del-address" placeholder="العنوان بالتفصيل">
                 `;
             } else if (currentOrderType === 'hall') {
-                // الصالة لا يتم تسجيل شيء فيها
                 container.innerHTML = '';
             }
         }
 
-        // 🔍 البحث التلقائي في حافظة العملاء أثناء الكتابة
         function searchCustomer(query) {
             const resultsBox = document.getElementById('search-results');
             if (!query || query.trim().length < 2) {
@@ -493,7 +548,6 @@
             resultsBox.style.display = 'block';
         }
 
-        // 🎯 اختيار العميل وتعبئة البيانات تلقائياً
         function selectCustomer(phone) {
             const cust = customersDatabase[phone];
             if (cust) {
@@ -563,7 +617,6 @@
             return now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
         }
 
-        // طباعة الفاتورة
         function printReceipt(orderId, type, items, total, customerInfo) {
             const printArea = document.getElementById('receipt-print-area');
             let itemsRows = '';
@@ -659,7 +712,6 @@
 
             } else if (type === 'hall') {
                 const hallNum = document.getElementById('sub-location').value;
-                // ✅ تعديل: يتم فقط فتح الصالة وحفظ طلبها دون طباعة ودون تسجيل إيراد/خزنة في الوقت الحالي
                 hallsStatus[hallNum] = { status: 'busy', order: [...cart], total: total, details: detailsStr };
                 renderHalls();
                 alert(`تم إرسال الطلب لصالة ${hallNum} بنجاح. سيتم طباعة الوصل والتحصيل عند إغلاق الطاولة.`);
@@ -676,7 +728,6 @@
 
                 customerInfo = { name, phone, address };
 
-                // 💾 تسجيل العميل وتحديث الحافظة تلقائياً للمرات القادمة
                 customersDatabase[phone] = { name: name || 'بدون اسم', address: address };
                 localStorage.setItem('pos_customers_db', JSON.stringify(customersDatabase));
 
@@ -808,7 +859,6 @@
             }
         }
 
-        // ✅ التعديل هنا: عند الضغط على زر التحصيل في الصالة يتم تسجيل الإيراد وطباعة الفاتورة للعميل وتفريغ الصالة
         function confirmHallCollection(hallNum, total, details, itemsArr) {
             recordCompletedOrder(`صالة ${hallNum}`, total, details, itemsArr, {});
             hallsStatus[hallNum] = { status: 'empty', order: null };
